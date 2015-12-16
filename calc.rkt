@@ -9,6 +9,7 @@
 (define-tokens value-tokens (NUM VAR FNCT))
 (define-empty-tokens op-tokens (newline = OP CP + - * / ^ EOF NEG LTE GTE EQ NEQ SC OB CB OC CC ELSE IF INT VOID RETURN WHILE))
 
+
 ;; A hash table to store variable values in for the calculator
 (define vars (make-hash))
 
@@ -69,7 +70,8 @@
            ;; and try to start over right after the error
            [(error start) $2]
            [(exp) $1])    
-    (exp [(NUM) $1]
+    (exp
+         [(NUM) $1]
          [(VAR) (hash-ref vars $1 (lambda () 0))]
          [(VAR = exp) (begin (hash-set! vars $1 $3)
                              $3)]
@@ -80,7 +82,10 @@
          [(exp / exp) (/ $1 $3)]
          [(- exp) (prec NEG) (- $2)]
          [(exp ^ exp) (expt $1 $3)]
-         [(OP exp CP) $2]))))
+         [(OP exp CP) $2])
+    );end grammer
+   );end parser
+  );end calcp
            
 ;; run the calculator on the given input-port       
 (define (calc ip)
@@ -89,8 +94,10 @@
 	    (lambda ()
 	      (let ((result (calcp (lambda () (calcl ip)))))
 		(when result
-                  ;(printf "~a\n" result)
-                  ;Accumulate value in list, let(each var in hash table), wrap let with each thing in list
+                  (printf "~a\n" result)
+                  ;accumulate values in list
+                  ;let(each var in hash table)
+                  ;wrap let with each thing in list
                   (one-line))))))
     (one-line)))
 

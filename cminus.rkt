@@ -247,7 +247,7 @@
                   (printf "STA *$~a~n" (8bit->hex IOINTH))
                   (printf "STA *$~a~n" (8bit->hex IOFROB))
                   ;; Scheme result
-                  ;; (printf "~a\n" result)
+                  ;(printf "~a\n" result)
                   (one-line))))))
     (one-line))
   (display "HLT") ;; Hex 02
