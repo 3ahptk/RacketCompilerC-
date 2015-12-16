@@ -7,7 +7,7 @@
          (prefix-in : parser-tools/lex-sre))
 
 (define-tokens value-tokens (NUM VAR FNCT))
-(define-empty-tokens op-tokens (newline = OP CP + - * / ^ EOF NEG begin end token-newline))
+(define-empty-tokens op-tokens (newline = OP CP + - * / ^ EOF NEG LTE GTE EQ NEQ SC OB CB OC CC ELSE IF INT VOID RETURN WHILE))
 
 ;; A hash table to store variable values in for the calculator
 (define vars (make-hash))
@@ -18,9 +18,6 @@
  ;; (:/ 0 9) would not work because the lexer does not understand numbers.
  ;; But (:/ #\0 #\9) is ok.
  (digit (:/ "0" "9")))
-
-(define (cube3 x)
-  (* x x x));syntactic sugar
  
 (define calcl
   (lexer
@@ -33,15 +30,24 @@
    [#\newline (token-newline)]
    ;; Since (token-=) returns '=, just return the symbol directly
    [(:or "=" "+" "-" "*" "/" "^") (string->symbol lexeme)]
-   ["**" '^]
+   ["<=" 'LTE]
+   [">=" 'GTE]
+   ["==" 'EQ]
+   ["!=" 'NEQ]
+   [";" 'SC]
    ["(" 'OP]
    [")" 'CP]
-   ["{" 'begin]
-   ["}" 'end]
+   ["[" 'OB]
+   ["]" 'CB]
+   ["{" 'OC]
+   ["}" 'CC]
+   ["else" 'ELSE]
+   ["if" 'IF]
+   ["int" 'INT]
+   ["void" 'VOID]
+   ["return" 'RETURN]
+   ["while" 'WHILE]
    ["sin" (token-FNCT sin)]
-   ["cos" (token-FNCT cos)]
-   ["tan" (token-FNCT tan)]
-   ["cube" (token-FNCT cube3)]
    [(:+ (:or lower-letter upper-letter)) (token-VAR (string->symbol lexeme))]
    [(:+ digit) (token-NUM (string->number lexeme))]
    [(:: (:+ digit) #\. (:* digit)) (token-NUM (string->number lexeme))]))
@@ -62,16 +68,11 @@
            ;; If there is an error, ignore everything before the error
            ;; and try to start over right after the error
            [(error start) $2]
-           [(begin prog) (list 'let '() $2)])
-    (prog [(prog exp token-newline end) $2]
-          [(exp token-newline) $1]
-          [(end) #f])
+           [(exp) $1])    
     (exp [(NUM) $1]
-         [(VAR) ;(hash-ref vars $1 (lambda () 0))
-                $1]
-         [(VAR = exp) ;(begin (hash-set! vars $1 $3)
-                      ;      $3)
-                      (list 'set! $1 $3)]
+         [(VAR) (hash-ref vars $1 (lambda () 0))]
+         [(VAR = exp) (begin (hash-set! vars $1 $3)
+                             $3)]
          [(FNCT OP exp CP) ($1 $3)]
          [(exp + exp) (+ $1 $3)]
          [(exp - exp) (- $1 $3)]
@@ -86,20 +87,15 @@
   (port-count-lines! ip)
   (letrec ((one-line
 	    (lambda ()
-	      (let ((result (calcp (λ() (calcl ip)))))
+	      (let ((result (calcp (lambda () (calcl ip)))))
 		(when result
-                  (printf "~a\n" result)
+                  ;(printf "~a\n" result)
+                  ;Accumulate value in list, let(each var in hash table), wrap let with each thing in list
                   (one-line))))))
     (one-line)))
 
 ;; Some examples
-(calc (open-input-string "{ x=1\n \n(x + 2 * 3) - (1+2)*3 }"))
-;(calc (open-input-string "x"))
-;(calc (open-input-string "y=2+(x=5)"))
-;(calc (open-input-string "x"))
-;(calc (open-input-string "sin(90)"))
-;(calc (open-input-string "cos(90)"))
-;(calc (open-input-string "tan(90)"))
-;(calc (open-input-string "cube(3)"))
-;(calc (open-input-string "2**8"))
-;(calc (open-input-string "2^8"))
+(calc (open-input-string "x=1\n(x + 2 * 3) - (1+2)*3"))
+(calc (open-input-string "x"))
+(calc (open-input-string "y=2+(x=5)"))
+(calc (open-input-string "x"))
