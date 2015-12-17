@@ -382,7 +382,7 @@
                                        (8bit->hex MATH1HI))
                           ;; Call SUB subroutine
                           (format-code 3 "20 ~a ~a " hexLo hexHi) ;; <==== byte reversal!!!
-                          ;; Push sum onto Stack
+                          ;; Push difference onto Stack
                           (format-code 6 "A5 ~a 48 A5 ~a 48 " 
                                        (8bit->hex MATH3HI)
                                        (8bit->hex MATH3LO))
@@ -440,7 +440,7 @@
                                        (8bit->hex MATH1HI))
                           ;; Call SUB subroutine
                           (format-code 3 "20 ~a ~a " hexLo hexHi) ;; <==== byte reversal!!!
-                          ;; Push sum onto Stack
+                          ;; Push difference onto Stack
                           (format-code 6 "A5 ~a 48 A5 ~a 48 " 
                                        (8bit->hex MATH3HI)
                                        (8bit->hex MATH3LO))
