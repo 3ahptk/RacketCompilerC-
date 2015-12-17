@@ -297,4 +297,7 @@
   )
 
 ;; Some examples
-(calc (open-input-string "a=1\nb=1234\na + (b - 20)"))
+;(calc (open-input-string "a=1\nb=1234\na + (b - 20)"))
+(calc (open-input-string "a=5\n
+                          f(n)=n*n\n
+                          f(5)"))
