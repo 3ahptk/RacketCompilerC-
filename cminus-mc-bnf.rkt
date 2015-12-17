@@ -74,7 +74,7 @@
 
 ;; Tokens
 (define-tokens value-tokens (NUM VAR-ID FNCT))
-(define-empty-tokens op-tokens (= + SEMICOLON COMMA OB CB OP CP EQUIVALENCE NOTEQUALS WHILE INT VOID EOF NEG))
+(define-empty-tokens op-tokens (= + - * / SEMICOLON COMMA OB CB OP CP EQUIVALENCE NOTEQUALS WHILE INT VOID EOF NEG IF ELSE))
 
 ;; LEXER SHORTHAND
 (define-lex-abbrevs
@@ -92,10 +92,12 @@
    ;; Returning the result of that operation.  
    ;; This effectively skips all whitespace.
    [(:or #\tab #\space #\newline) (lex input-port)]
-   [(:or "=" "+" ) (string->symbol lexeme)]
+   [(:or "=" "+" "-" "*" "/") (string->symbol lexeme)]
    ["void" 'VOID]
    ["int" 'INT]
    ["while" 'WHILE]
+   ["if" 'IF]
+   ["else" 'ELSE]
    ["==" 'EQUIVALENCE]
    ["!=" 'NOTEQUALS]
    ["," 'COMMA]
@@ -121,7 +123,10 @@
    (precs 
     (right SEMICOLON)
     (right =)
-    (left +))
+    (left - +)
+    (left * /)
+    (left NEG))
+   
    (grammar
     ;; USE GRAMMAR FROM C- SPEC
     ;; This is a partial implementation of that grammar
@@ -174,12 +179,32 @@
     (STATEMENT
      [(EXPRESSION-STMT) $1]
      [(COMPOUND-STMT) $1]
+     [(SELECTION-STMT) $1]
      [(ITERATION-STMT) $1]
-     )    
+     )
     
     (EXPRESSION-STMT
      [(EXPRESSION SEMICOLON) (string-append $1 (format-code 2 "68 68 "))]
-     [(SEMICOLON) ""]) 
+     [(SEMICOLON) ""])
+
+    (SELECTION-STMT
+      ;if-then
+      [(IF OP EXPRESSION CP STATEMENT)
+      (let-values ([(lo hi hexLo hexHi) (int->16bit (- program-counter (/ (string-length $5) 3) (/ (string-length $3) 3)))])
+        (string-append
+
+         )
+        )
+      ]
+      ;if-then-else
+      [(IF OP EXPRESSION CP STATEMENT ELSE STATEMENT)
+      (let-values ([(lo hi hexLo hexHi) (int->16bit (- program-counter  (/ (string-length $7) 3) (/ (string-length $5) 3) (/ (string-length $3) 3)))])
+        (string-append
+
+         )
+        )
+      ]
+    )
     
     (ITERATION-STMT
      ;; While Loops
@@ -188,14 +213,14 @@
         (string-append
          $3
          (format-code 6 "68 85 ~a 68 85 ~a " (8bit->hex WORK1LO) (8bit->hex WORK1HI));
-         (format-code 2 "A5 ~a " (8bit->hex WORK1LO)) ;lda worklo 
+         (format-code 2 "A5 ~a " (8bit->hex WORK1LO)) ;lda worklo
          (format-code 2 "D0 05 ") ;beq to start of stmt
          (format-code 2 "A5 ~a " (8bit->hex WORK1HI)) ;lda workhi
          (let-values ([(lo hi hexLo hexHi) (int->16bit (+ program-counter 6))])
            (format-code 3 "4C ~a ~a " hexLo hexHi) ;jmp past stmt
            )
          $5
-         (format-code 3 "4C ~a ~a " hexLo hexHi);jmp to $3 
+         (format-code 3 "4C ~a ~a " hexLo hexHi);jmp to $3
          )
         )
       ])  
@@ -318,7 +343,6 @@
     (ADDITIVE-EXPRESSION
      [(ADDITIVE-EXPRESSION ADDOP TERM) 
       (cond
-        ;; Only Addition is defined
         [(equal? $2 '+) 
          (let-values ([(lo hi hexLo hexHi) (int->16bit ADD)])
            (string-append $1 $3
@@ -340,20 +364,99 @@
                                        (8bit->hex MATH3HI)
                                        (8bit->hex MATH3LO))
                           )
-           )
+                 )
          ]
+         [(equal? $2 '-)
+         (let-values ([(lo hi hexLo hexHi) (int->16bit SUBTRACT)])
+           (string-append $1 $3
+                          ;; Assembly Code
+                          ;; Pull Right-hand expression off Stack
+                          ;; Store in Addend workspace
+                          (format-code 6 "68 85 ~a 68 85 ~a " 
+                                       (8bit->hex MATH2LO)
+                                       (8bit->hex MATH2HI))
+                          ;; Pull Left-hand expression off Stack
+                          ;; Store in Augend workspace
+                          (format-code 6 "68 85 ~a 68 85 ~a " 
+                                       (8bit->hex MATH1LO)
+                                       (8bit->hex MATH1HI))
+                          ;; Call SUB subroutine
+                          (format-code 3 "20 ~a ~a " hexLo hexHi) ;; <==== byte reversal!!!
+                          ;; Push sum onto Stack
+                          (format-code 6 "A5 ~a 48 A5 ~a 48 " 
+                                       (8bit->hex MATH3HI)
+                                       (8bit->hex MATH3LO))
+                          )
+                 )
+         ]     
         )
       ]
      
      [(TERM) $1])
     
-    ;; Only Addition is defined
     (ADDOP
-     [(+) '+]) 
+     [(+) '+]
+     [(-) '-]) 
     
     (TERM
+     [(TERM MULOP FACTOR)
+      (cond
+        [(equal? $2 '*) 
+         (let-values ([(lo hi hexLo hexHi) (int->16bit MULTIPLY)])
+           (string-append $1 $3
+                          ;; Assembly Code
+                          ;; Pull Right-hand expression off Stack
+                          ;; Store in Addend workspace
+                          (format-code 6 "68 85 ~a 68 85 ~a " 
+                                       (8bit->hex MATH2LO)
+                                       (8bit->hex MATH2HI))
+                          ;; Pull Left-hand expression off Stack
+                          ;; Store in Augend workspace
+                          (format-code 6 "68 85 ~a 68 85 ~a " 
+                                       (8bit->hex MATH1LO)
+                                       (8bit->hex MATH1HI))
+                          ;; Call ADD subroutine
+                          (format-code 3 "20 ~a ~a " hexLo hexHi) ;; <==== byte reversal!!!
+                          ;; Push sum onto Stack
+                          (format-code 6 "A5 ~a 48 A5 ~a 48 " 
+                                       (8bit->hex MATH3HI)
+                                       (8bit->hex MATH3LO))
+                          )
+                 )
+         ]
+         [(equal? $2 '/)
+         (let-values ([(lo hi hexLo hexHi) (int->16bit DIVISION)])
+           (string-append $1 $3
+                          ;; Assembly Code
+                          ;; Pull Right-hand expression off Stack
+                          ;; Store in Addend workspace
+                          (format-code 6 "68 85 ~a 68 85 ~a " 
+                                       (8bit->hex MATH2LO)
+                                       (8bit->hex MATH2HI))
+                          ;; Pull Left-hand expression off Stack
+                          ;; Store in Augend workspace
+                          (format-code 6 "68 85 ~a 68 85 ~a " 
+                                       (8bit->hex MATH1LO)
+                                       (8bit->hex MATH1HI))
+                          ;; Call SUB subroutine
+                          (format-code 3 "20 ~a ~a " hexLo hexHi) ;; <==== byte reversal!!!
+                          ;; Push sum onto Stack
+                          (format-code 6 "A5 ~a 48 A5 ~a 48 " 
+                                       (8bit->hex MATH3HI)
+                                       (8bit->hex MATH3LO))
+                          )
+                 )
+         ]     
+        )
+
+
+     ]
      [(FACTOR) $1]
      )
+
+    (MULOP
+     [(*) '*]
+     [(/) '/])
     
     (FACTOR
      [(OP EXPRESSION CP ) $2]
@@ -456,4 +559,15 @@
   )
 
 ;; quick test
-(make (open-input-string "int x; void main(){x=0;while(x!=5){output(x);x=x+1;}\noutput(x);}"))
+(make
+ (open-input-string
+       "int x;
+        void main(){
+          x=5;
+          while(x!=0){
+            output(x);
+            x=x-1;
+          }\n
+          output(x);
+        }")
+      )
